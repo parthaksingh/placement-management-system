@@ -15,6 +15,9 @@ export default function Login({ onLogin }) {
     setLoading(true);
     setError('');
     try {
+      if (import.meta.env.VITE_DEBUG_AUTH === 'true') {
+        console.info('[auth] Login button submitted', { identifier: loginIdentifier || identifier });
+      }
       const d = await api('/auth/login', {
         method: 'POST',
         body: JSON.stringify({
@@ -23,8 +26,12 @@ export default function Login({ onLogin }) {
         })
       });
       localStorage.setItem('placesmart_token', d.token);
+      if (import.meta.env.VITE_DEBUG_AUTH === 'true') {
+        console.info('[auth] Login succeeded', { role: d.user?.role, destination: d.user?.role === 'ADMIN' ? 'Admin dashboard' : 'Student dashboard' });
+      }
       onLogin(d.user);
     } catch (err) {
+      if (import.meta.env.VITE_DEBUG_AUTH === 'true') console.error('[auth] Login failed', err.message);
       setError(err.message || 'Login failed');
     }
     setLoading(false);

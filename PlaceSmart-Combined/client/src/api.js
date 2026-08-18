@@ -1,6 +1,7 @@
 const configuredBase = import.meta.env.VITE_API_URL?.trim();
 const BASE = (configuredBase || (import.meta.env.DEV ? 'http://localhost:5050/api' : ''))
   .replace(/\/$/, '');
+const debugAuth = import.meta.env.VITE_DEBUG_AUTH === 'true';
 
 export async function api(path, options = {}) {
   if (!BASE) {
@@ -10,6 +11,7 @@ export async function api(path, options = {}) {
   const token = localStorage.getItem('placesmart_token');
   let r;
   try {
+    if (debugAuth) console.info('[auth] Request', { url: `${BASE}${path}`, method: options.method || 'GET' });
     r = await fetch(`${BASE}${path}`, {
       ...options,
       headers: {
@@ -25,6 +27,7 @@ export async function api(path, options = {}) {
   if (r.status === 204) return null;
   const contentType = r.headers.get('content-type') || '';
   const data = contentType.includes('application/json') ? await r.json() : null;
+  if (debugAuth) console.info('[auth] Response', { status: r.status, message: data?.message });
 
   if (!r.ok) {
     const fallback = {

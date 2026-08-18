@@ -2,6 +2,7 @@ import 'dotenv/config';
 import express from 'express';
 import cors from 'cors';
 import mongoose from 'mongoose';
+import { ensureDemoAccounts } from './demo-users.js';
 import { auth, allow } from './auth.js';
 import authRoutes from './routes/auth.js';
 import studentRoutes from './routes/student.js';
@@ -19,7 +20,9 @@ app.use(cors({
     if (!origin || allowedOrigins.length === 0 || allowedOrigins.includes(origin)) {
       return callback(null, true);
     }
-    return callback(new Error('Origin is not allowed by CORS'));
+    const error = new Error('Origin is not allowed by CORS');
+    error.status = 403;
+    return callback(error);
   },
   methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
   allowedHeaders: ['Content-Type', 'Authorization']
@@ -55,5 +58,11 @@ const uri = process.env.MONGODB_URI;
 if (!uri) { console.error('MONGODB_URI is not set in server/.env'); process.exit(1); }
 
 mongoose.connect(uri)
-  .then(() => app.listen(port, () => console.log(`PlaceSmart Combined API running on port ${port}`)))
+  .then(async () => {
+    if (process.env.DEMO_ACCOUNTS_ENABLED === 'true') {
+      await ensureDemoAccounts();
+      console.log('Demo accounts are available.');
+    }
+    app.listen(port, () => console.log(`PlaceSmart Combined API running on port ${port}`));
+  })
   .catch(e => { console.error('MongoDB connection failed:', e.message); process.exit(1); });
