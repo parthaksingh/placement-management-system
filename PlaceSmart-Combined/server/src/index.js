@@ -8,7 +8,22 @@ import studentRoutes from './routes/student.js';
 import adminRoutes from './routes/admin.js';
 
 const app = express();
-app.use(cors());
+const allowedOrigins = (process.env.CLIENT_ORIGIN || '')
+  .split(',')
+  .map(origin => origin.trim())
+  .filter(Boolean);
+
+app.use(cors({
+  origin(origin, callback) {
+    // Allow non-browser requests and all origins until CLIENT_ORIGIN is configured.
+    if (!origin || allowedOrigins.length === 0 || allowedOrigins.includes(origin)) {
+      return callback(null, true);
+    }
+    return callback(new Error('Origin is not allowed by CORS'));
+  },
+  methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
+  allowedHeaders: ['Content-Type', 'Authorization']
+}));
 app.use(express.json());
 
 // Health check
@@ -23,10 +38,16 @@ app.use('/api/student', auth, allow('STUDENT'), studentRoutes);
 // Admin routes (authenticated, ADMIN role only)
 app.use('/api/admin', auth, allow('ADMIN'), adminRoutes);
 
+// Always return JSON to API clients, including for unknown routes.
+app.use('/api', (req, res) => {
+  res.status(404).json({ message: `API route not found: ${req.method} ${req.originalUrl}` });
+});
+
 // Global error handler
 app.use((err, req, res, next) => {
   console.error(err);
-  res.status(err.status || 500).json({ message: err.message || 'Unexpected server error' });
+  const status = err.status || (err.type === 'entity.parse.failed' ? 400 : 500);
+  res.status(status).json({ message: status === 500 ? 'Unexpected server error' : err.message });
 });
 
 const port = process.env.PORT || 5050;

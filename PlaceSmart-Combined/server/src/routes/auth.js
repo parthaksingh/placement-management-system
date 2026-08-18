@@ -7,6 +7,7 @@ import Student from '../models/Student.js';
 const router = Router();
 const secret = () => process.env.JWT_SECRET || 'dev-secret';
 const sign = u => jwt.sign({ id: u._id, role: u.role, name: u.name }, secret(), { expiresIn: '7d' });
+const escapeRegExp = value => value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 
 // POST /api/auth/login — supports College Email OR Registration Number / ID for both STUDENT and ADMIN
 router.post('/login', async (req, res, next) => {
@@ -25,14 +26,14 @@ router.post('/login', async (req, res, next) => {
     } else {
       // 1. Check User model by registrationNumber
       user = await User.findOne({
-        registrationNumber: new RegExp(`^${identifier}$`, 'i'),
+        registrationNumber: new RegExp(`^${escapeRegExp(identifier)}$`, 'i'),
         active: true
       });
 
       // 2. If not found in User, check Student model by registrationNumber
       if (!user) {
         const student = await Student.findOne({
-          registrationNumber: new RegExp(`^${identifier}$`, 'i'),
+          registrationNumber: new RegExp(`^${escapeRegExp(identifier)}$`, 'i'),
           status: { $ne: 'INACTIVE' }
         });
         if (student && student.user) {

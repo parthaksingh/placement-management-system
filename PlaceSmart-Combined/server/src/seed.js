@@ -39,7 +39,7 @@ const studentData = [
 const hash = await bcrypt.hash('Password123!', 10);
 const students = [];
 for (const d of studentData) {
-  const user = await User.create({ name: d.name, email: d.email, password: hash, role: 'STUDENT' });
+  const user = await User.create({ name: d.name, email: d.email, registrationNumber: d.reg, password: hash, role: 'STUDENT' });
   const student = await Student.create({
     user: user._id, name: d.name, email: d.email,
     registrationNumber: d.reg, branch: d.branch, cgpa: d.cgpa,

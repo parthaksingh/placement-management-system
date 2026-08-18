@@ -1,17 +1,42 @@
-const BASE = import.meta.env.VITE_API_URL || 'http://localhost:5050/api';
+const configuredBase = import.meta.env.VITE_API_URL?.trim();
+const BASE = (configuredBase || (import.meta.env.DEV ? 'http://localhost:5050/api' : ''))
+  .replace(/\/$/, '');
 
 export async function api(path, options = {}) {
+  if (!BASE) {
+    throw new Error('The application API URL is not configured. Set VITE_API_URL in Vercel and redeploy.');
+  }
+
   const token = localStorage.getItem('placesmart_token');
-  const r = await fetch(`${BASE}${path}`, {
-    ...options,
-    headers: {
-      'Content-Type': 'application/json',
-      ...(token ? { Authorization: `Bearer ${token}` } : {}),
-      ...options.headers
-    }
-  });
+  let r;
+  try {
+    r = await fetch(`${BASE}${path}`, {
+      ...options,
+      headers: {
+        'Content-Type': 'application/json',
+        ...(token ? { Authorization: `Bearer ${token}` } : {}),
+        ...options.headers
+      }
+    });
+  } catch {
+    throw new Error('Unable to reach the server. Check VITE_API_URL and the backend CORS settings.');
+  }
+
   if (r.status === 204) return null;
-  const data = await r.json();
-  if (!r.ok) throw new Error(data.message || 'Request failed');
+  const contentType = r.headers.get('content-type') || '';
+  const data = contentType.includes('application/json') ? await r.json() : null;
+
+  if (!r.ok) {
+    const fallback = {
+      400: 'Please check the information you entered.',
+      401: 'Invalid ID or password.',
+      403: 'You do not have permission to access this area.',
+      404: 'The requested API route was not found. Check VITE_API_URL.',
+      500: 'The server had a problem. Please try again shortly.'
+    }[r.status] || `Request failed (HTTP ${r.status}).`;
+    throw new Error(data?.message || fallback);
+  }
+
+  if (!data) throw new Error('The server returned an unexpected response. Check VITE_API_URL.');
   return data;
 }
