@@ -66,6 +66,10 @@ export default function Login({ onLogin }) {
                   <p className="demo-card-role">Placement Cell Operations</p>
                 </div>
               </div>
+              <div className="demo-credentials">
+                <span><b>ID</b> ADMIN001</span>
+                <span><b>Password</b> Password123!</span>
+              </div>
               <button
                 type="button"
                 className="demo-card-btn admin"
@@ -97,6 +101,10 @@ export default function Login({ onLogin }) {
                   <h4 className="demo-card-title">Student Portal</h4>
                   <p className="demo-card-role">Campus Placements & Drives</p>
                 </div>
+              </div>
+              <div className="demo-credentials">
+                <span><b>ID</b> PS2022001</span>
+                <span><b>Password</b> Password123!</span>
               </div>
               <button
                 type="button"
