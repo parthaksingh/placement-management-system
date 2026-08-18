@@ -1,0 +1,6 @@
+{
+  "name": "placesmart-admin-portal",
+  "private": true,
+  "scripts": { "dev": "concurrently \"npm run dev --prefix server\" \"npm run dev --prefix client\"", "seed": "npm run seed --prefix server" },
+  "devDependencies": { "concurrently": "^9.1.2" }
+}
