@@ -41,6 +41,7 @@ const POPULAR_SKILLS = [
 export default function StudentDashboard({ user, tab, setTab, logout }) {
   const [drives, setDrives] = useState([]);
   const [apps, setApps] = useState([]);
+  const [interviewRounds, setInterviewRounds] = useState([]);
   const [notifications, setNotifications] = useState([]);
   const [notice, setNotice] = useState('');
 
@@ -63,11 +64,13 @@ export default function StudentDashboard({ user, tab, setTab, logout }) {
     Promise.all([
       api('/student/placement-drives'),
       api('/student/applications'),
+      api('/student/interview-rounds'),
       api('/student/notifications'),
       api('/student/profile')
-    ]).then(([d, a, n, p]) => {
+    ]).then(([d, a, rounds, n, p]) => {
       setDrives(d || []);
       setApps(a || []);
+      setInterviewRounds(rounds || []);
       setNotifications(n || []);
       if (p) {
         setProfileData({
@@ -88,6 +91,12 @@ export default function StudentDashboard({ user, tab, setTab, logout }) {
   useEffect(() => {
     loadData();
   }, []);
+
+  useEffect(() => {
+    if (tab === 'Interviews') {
+      api('/student/interview-rounds').then(rounds => setInterviewRounds(rounds || [])).catch(() => {});
+    }
+  }, [tab]);
 
   const apply = async id => {
     try {
@@ -210,16 +219,25 @@ export default function StudentDashboard({ user, tab, setTab, logout }) {
       <div className="panel-title">
         <div><h2>Upcoming interviews</h2><p>Your scheduled technical rounds and interviews.</p></div>
       </div>
-      {interviewApps.length ? interviewApps.map(a => (
-        <article className="drive" key={a._id}>
-          <div className="logo">{a.company?.name?.slice(0, 1) || 'I'}</div>
+      {interviewRounds.length ? interviewRounds.map(round => (
+        <article className="drive" key={round._id}>
+          <div className="logo">{round.company?.name?.slice(0, 1) || 'I'}</div>
           <div className="drive-info">
-            <h3>{a.company?.name || 'Company'}</h3>
-            <p>{a.placementDrive?.jobTitle} <b>·</b> {a.currentStage}</p>
-            <div><span className="chip blue">{a.status}</span></div>
+            <h3>{round.company?.name || 'Company'}</h3>
+            <p>{round.placementDrive?.jobTitle || 'Placement drive'} <b>·</b> {round.applicationStatus}</p>
+            <h4 style={{ margin: '12px 0 4px' }}>{round.roundName || 'Interview round'}</h4>
+            <p>{round.roundType || 'Interview'} <b>·</b> {round.date ? new Date(round.date).toLocaleDateString('en-IN') : 'Date to be announced'} <b>·</b> {round.time || 'Time to be announced'}</p>
+            <div style={{ display: 'flex', flexWrap: 'wrap', gap: '6px', alignItems: 'center' }}>
+              {round.location && <span className="chip">Location: {round.location}</span>}
+              <span className="chip blue">{round.status}</span>
+              {round.meetingLink && <a className="link" href={round.meetingLink} target="_blank" rel="noopener noreferrer">Join Interview</a>}
+            </div>
+            {round.description && <p style={{ marginTop: '10px' }}>{round.description}</p>}
           </div>
         </article>
-      )) : <div className="empty">No interviews are scheduled at the moment.</div>}
+      )) : interviewApps.length
+        ? <div className="empty">You are shortlisted, but no interview has been scheduled yet.</div>
+        : <div className="empty">No interviews are scheduled at the moment.</div>}
     </section>
   );
 

@@ -3,7 +3,9 @@ import Student from '../models/Student.js';
 import PlacementDrive from '../models/PlacementDrive.js';
 import Application from '../models/Application.js';
 import Notification from '../models/Notification.js';
+import InterviewAssignment from '../models/InterviewAssignment.js';
 import { eligibility } from '../eligibility.js';
+import { sortInterviewRounds } from '../interview-rounds.js';
 
 const router = Router();
 
@@ -54,6 +56,28 @@ router.get('/placement-drives/:id/eligibility', async (req, res, next) => {
     ]);
     if (!drive) return res.status(404).json({ message: 'Drive not found' });
     res.json(eligibility(student, drive));
+  } catch (e) { next(e); }
+});
+
+// GET /api/student/interview-rounds — only rounds explicitly assigned to this student.
+router.get('/interview-rounds', async (req, res, next) => {
+  try {
+    const student = await studentFor(req.user.id);
+    if (!student) return res.status(404).json({ message: 'Student profile not found' });
+
+    const assignments = await InterviewAssignment.find({ student: student._id })
+      .populate({ path: 'interviewRound', populate: [{ path: 'company', select: 'name' }, { path: 'placementDrive', select: 'jobTitle' }] })
+      .lean();
+    const driveIds = assignments.map(assignment => assignment.placementDrive);
+    const applications = await Application.find({ student: student._id, placementDrive: { $in: driveIds } })
+      .select('placementDrive status')
+      .lean();
+    const applicationStatus = new Map(applications.map(application => [String(application.placementDrive), application.status]));
+    const rounds = assignments.map(assignment => assignment.interviewRound).filter(Boolean);
+    res.json(sortInterviewRounds(rounds).map(round => ({
+      ...round,
+      applicationStatus: applicationStatus.get(String(round.placementDrive?._id)) || 'ASSIGNED'
+    })));
   } catch (e) { next(e); }
 });
 

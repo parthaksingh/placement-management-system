@@ -5,7 +5,9 @@ import Company from '../models/Company.js';
 import PlacementDrive from '../models/PlacementDrive.js';
 import Application from '../models/Application.js';
 import InterviewRound from '../models/InterviewRound.js';
+import InterviewAssignment from '../models/InterviewAssignment.js';
 import Notification from '../models/Notification.js';
+import { assignmentStudentIds, interviewNotification, roundPayload } from '../interview-rounds.js';
 
 const router = Router();
 const popApp = [{ path: 'student' }, { path: 'company' }, { path: 'placementDrive' }];
@@ -170,6 +172,28 @@ router.delete('/placement-drives/:id', async (req, res, next) => {
   } catch (e) { next(e); }
 });
 
+// Candidates are deliberately restricted to shortlisted applications for this drive.
+// The administrator controls progression to every individual interview round.
+router.get('/placement-drives/:id/interview-candidates', async (req, res, next) => {
+  try {
+    const selectedAssignments = req.query.roundId
+      ? await InterviewAssignment.find({ interviewRound: req.query.roundId }).select('student').lean()
+      : [];
+    const selectedStudentIds = selectedAssignments.map(assignment => assignment.student);
+    const applications = await Application.find({
+      placementDrive: req.params.id,
+      $or: [{ status: 'SHORTLISTED' }, { student: { $in: selectedStudentIds } }]
+    })
+      .populate('student', 'name email registrationNumber branch')
+      .sort('student.name')
+      .lean();
+    res.json(applications.filter(application => application.student).map(application => ({
+      applicationId: application._id,
+      student: application.student
+    })));
+  } catch (e) { next(e); }
+});
+
 // ── Applications ───────────────────────────────────────────────────────────
 router.get('/applications', async (req, res, next) => {
   try {
@@ -216,17 +240,106 @@ router.put('/applications/:id/status', async (req, res, next) => {
 
 // ── Interview Rounds ───────────────────────────────────────────────────────
 router.get('/interview-rounds', async (req, res, next) => {
-  try { res.json(await InterviewRound.find().populate('company placementDrive').sort('date')); } catch (e) { next(e); }
+  try {
+    const rounds = await InterviewRound.find().populate('company placementDrive').sort('date').lean();
+    const counts = await InterviewAssignment.aggregate([
+      { $group: { _id: '$interviewRound', count: { $sum: 1 } } }
+    ]);
+    const countByRound = new Map(counts.map(item => [String(item._id), item.count]));
+    res.json(rounds.map(round => ({ ...round, assignedStudentCount: countByRound.get(String(round._id)) || 0 })));
+  } catch (e) { next(e); }
 });
 
+router.get('/interview-rounds/:id', async (req, res, next) => {
+  try {
+    const round = await InterviewRound.findById(req.params.id).populate('company placementDrive').lean();
+    if (!round) return res.status(404).json({ message: 'Interview round not found' });
+    const assignments = await InterviewAssignment.find({ interviewRound: round._id }).select('student').lean();
+    res.json({ ...round, studentIds: assignments.map(assignment => String(assignment.student)) });
+  } catch (e) { next(e); }
+});
+
+const shortlistedStudentIds = async placementDrive => {
+  const applications = await Application.find({ placementDrive, status: 'SHORTLISTED' }).select('student').lean();
+  return new Set(applications.map(application => String(application.student)));
+};
+
+const saveAssignments = async ({ round, drive, studentIds, previousStudentIds = [], scheduleUpdated = false }) => {
+  const requestedIds = assignmentStudentIds(studentIds);
+  const allowedIds = await shortlistedStudentIds(drive._id);
+  if (requestedIds.some(id => !allowedIds.has(id))) {
+    const error = new Error('Only shortlisted students for this placement drive can be assigned to an interview round.');
+    error.status = 400;
+    throw error;
+  }
+
+  await InterviewAssignment.deleteMany({ interviewRound: round._id, student: { $nin: requestedIds } });
+  if (requestedIds.length) {
+    await InterviewAssignment.bulkWrite(requestedIds.map(student => ({
+      updateOne: {
+        filter: { student, interviewRound: round._id },
+        update: { $set: { placementDrive: drive._id } },
+        upsert: true
+      }
+    })));
+  }
+
+  const recipients = scheduleUpdated
+    ? requestedIds
+    : requestedIds.filter(id => !previousStudentIds.includes(id));
+  if (!recipients.length) return;
+
+  const company = await Company.findById(drive.company).select('name').lean();
+  const notification = interviewNotification(round, drive, company, scheduleUpdated);
+  await Notification.insertMany(recipients.map(student => ({
+    ...notification,
+    targetAudience: 'INDIVIDUAL',
+    student,
+    placementDrive: drive._id
+  })));
+};
+
 router.post('/interview-rounds', async (req, res, next) => {
-  try { res.status(201).json(await InterviewRound.create(req.body)); } catch (e) { next(e); }
+  try {
+    const payload = roundPayload(req.body);
+    const drive = await PlacementDrive.findById(payload.placementDrive).select('company');
+    if (!drive) return res.status(400).json({ message: 'A valid placement drive is required.' });
+    if (String(drive.company) !== String(payload.company)) {
+      return res.status(400).json({ message: 'The interview round company must match its placement drive.' });
+    }
+    const requestedIds = assignmentStudentIds(req.body.studentIds);
+    const allowedIds = await shortlistedStudentIds(drive._id);
+    if (requestedIds.some(id => !allowedIds.has(id))) {
+      return res.status(400).json({ message: 'Only shortlisted students for this placement drive can be assigned to an interview round.' });
+    }
+    const round = await InterviewRound.create(payload);
+    await saveAssignments({ round, drive, studentIds: requestedIds });
+    res.status(201).json(round);
+  } catch (e) { next(e); }
 });
 
 router.put('/interview-rounds/:id', async (req, res, next) => {
   try {
-    const x = await InterviewRound.findByIdAndUpdate(req.params.id, req.body, { new: true, runValidators: true });
-    if (!x) return res.status(404).json({ message: 'Interview round not found' });
+    const existing = await InterviewRound.findById(req.params.id);
+    if (!existing) return res.status(404).json({ message: 'Interview round not found' });
+    const payload = roundPayload(req.body);
+    const drive = await PlacementDrive.findById(payload.placementDrive || existing.placementDrive).select('company');
+    const company = payload.company || existing.company;
+    if (!drive) return res.status(400).json({ message: 'A valid placement drive is required.' });
+    if (String(drive.company) !== String(company)) {
+      return res.status(400).json({ message: 'The interview round company must match its placement drive.' });
+    }
+    const previousAssignments = await InterviewAssignment.find({ interviewRound: existing._id }).select('student').lean();
+    const scheduleUpdated = ['roundName', 'roundType', 'date', 'time', 'location', 'meetingLink', 'description', 'status']
+      .some(key => String(existing[key] ?? '') !== String(payload[key] ?? existing[key] ?? ''));
+    const x = await InterviewRound.findByIdAndUpdate(req.params.id, payload, { new: true, runValidators: true });
+    await saveAssignments({
+      round: x,
+      drive,
+      studentIds: req.body.studentIds ?? previousAssignments.map(assignment => String(assignment.student)),
+      previousStudentIds: previousAssignments.map(assignment => String(assignment.student)),
+      scheduleUpdated
+    });
     res.json(x);
   } catch (e) { next(e); }
 });
@@ -235,6 +348,7 @@ router.delete('/interview-rounds/:id', async (req, res, next) => {
   try {
     const x = await InterviewRound.findByIdAndDelete(req.params.id);
     if (!x) return res.status(404).json({ message: 'Interview round not found' });
+    await InterviewAssignment.deleteMany({ interviewRound: x._id });
     res.status(204).end();
   } catch (e) { next(e); }
 });

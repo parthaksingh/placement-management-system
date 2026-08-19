@@ -2,6 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { normalizeBranch, normalizeSkill } from '../../../shared/eligibility-normalization.mjs';
 import { eligibility } from '../src/eligibility.js';
+import { assignmentStudentIds, interviewNotification, roundPayload, roundsForShortlistedApplications, sortInterviewRounds } from '../src/interview-rounds.js';
 
 const equivalent = (normalizer, left, right) =>
   assert.equal(normalizer(left), normalizer(right), `${left} should equal ${right}`);
@@ -50,4 +51,42 @@ test('eligibility does not treat AWS as Cloud Computing', () => {
   );
   assert.equal(result.eligible, false);
   assert.deepEqual(result.reasons, ['Missing required skills: Cloud Computing.']);
+});
+
+test('interview rounds use drive ids and are returned chronologically', () => {
+  assert.deepEqual(roundPayload({ companyId: 'company-1', placementDriveId: 'drive-1', roundName: 'Coding' }), {
+    company: 'company-1', placementDrive: 'drive-1', roundName: 'Coding'
+  });
+  const ordered = sortInterviewRounds([
+    { _id: 'technical', date: '2027-10-12', time: '14:00' },
+    { _id: 'coding', date: '2027-10-12', time: '12:20' },
+    { _id: 'assessment', date: '2027-10-11', time: '10:00' }
+  ]);
+  assert.deepEqual(ordered.map(round => round._id), ['assessment', 'coding', 'technical']);
+});
+
+test('student interview flow only returns rounds for shortlisted application drive ids', () => {
+  const rounds = roundsForShortlistedApplications(
+    [
+      { status: 'SHORTLISTED', placementDrive: 'microsoft-software-engineer' },
+      { status: 'PENDING', placementDrive: 'other-microsoft-drive' }
+    ],
+    [
+      { _id: 'coding', placementDrive: 'microsoft-software-engineer', date: '2027-10-12', time: '12:20' },
+      { _id: 'unrelated', placementDrive: 'other-microsoft-drive', date: '2027-10-12', time: '10:00' }
+    ]
+  );
+  assert.deepEqual(rounds.map(round => round._id), ['coding']);
+});
+
+test('interview assignments deduplicate students and notify with stored schedule data', () => {
+  assert.deepEqual(assignmentStudentIds(['student-1', 'student-1', '', 'student-2']), ['student-1', 'student-2']);
+  const notification = interviewNotification(
+    { roundName: 'Coding', date: '2027-10-12', time: '12:20', location: 'Seminar Hall A' },
+    { jobTitle: 'Software Engineer' }, { name: 'Microsoft' }
+  );
+  assert.equal(notification.title, 'New Interview Scheduled');
+  assert.match(notification.message, /Microsoft Coding/);
+  assert.match(notification.message, /12:20/);
+  assert.match(notification.message, /Seminar Hall A/);
 });
