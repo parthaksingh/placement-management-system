@@ -1,12 +1,17 @@
+import { hasRequiredSkill, normalizeBranch } from '../../../shared/eligibility-normalization.mjs';
+
 export function eligibility(student, drive) {
   const reasons = [];
   if ((student.cgpa || 0) < (drive.minimumCgpa || 0))
     reasons.push(`CGPA must be at least ${drive.minimumCgpa}; yours is ${student.cgpa || 0}.`);
-  if (drive.allowedBranches?.length && !drive.allowedBranches.includes(student.branch))
+  const studentBranch = normalizeBranch(student.branch);
+  const isBranchEligible = (drive.allowedBranches ?? []).some(
+    branch => normalizeBranch(branch) === studentBranch
+  );
+  if (drive.allowedBranches?.length && !isBranchEligible)
     reasons.push(`${student.branch || 'Your branch'} is not an eligible branch.`);
   if (drive.requiredSkills?.length) {
-    const studentSkills = (student.skills || []).map(x => x.toLowerCase());
-    const missing = drive.requiredSkills.filter(x => !studentSkills.includes(x.toLowerCase()));
+    const missing = drive.requiredSkills.filter(skill => !hasRequiredSkill(student.skills, skill));
     if (missing.length) reasons.push(`Missing required skills: ${missing.join(', ')}.`);
   }
   return { eligible: !reasons.length, reasons };
