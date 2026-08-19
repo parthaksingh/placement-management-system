@@ -6,7 +6,14 @@ const types = ['Aptitude', 'Technical', 'Coding', 'HR', 'Final Interview'];
 const statuses = ['SCHEDULED', 'COMPLETED', 'CANCELLED'];
 
 function InterviewRoundForm({ value = {}, companies, drives, onClose, onSave }) {
-  const [data, setData] = useState({ status: 'SCHEDULED', studentIds: [], ...value });
+  const [data, setData] = useState({
+    status: 'SCHEDULED',
+    studentIds: [],
+    studentResults: {},
+    ...value,
+    company: value.company?._id || value.company || '',
+    placementDrive: value.placementDrive?._id || value.placementDrive || ''
+  });
   const [candidates, setCandidates] = useState([]);
   const [search, setSearch] = useState('');
   const set = (key, next) => setData(current => ({ ...current, [key]: next }));
@@ -14,19 +21,26 @@ function InterviewRoundForm({ value = {}, companies, drives, onClose, onSave }) 
 
   useEffect(() => {
     if (!data.placementDrive) { setCandidates([]); return; }
-    const suffix = value._id ? `?roundId=${value._id}` : '';
+    const query = new URLSearchParams({ ...(value._id ? { roundId: value._id } : {}), roundType: data.roundType || '' });
+    const suffix = `?${query}`;
     api(`/admin/placement-drives/${data.placementDrive}/interview-candidates${suffix}`)
       .then(setCandidates)
       .catch(() => setCandidates([]));
-  }, [data.placementDrive, value._id]);
+  }, [data.placementDrive, data.roundType, value._id]);
 
   const filteredCandidates = candidates.filter(({ student }) => {
     const text = `${student.name} ${student.email} ${student.registrationNumber || ''} ${student.branch || ''}`.toLowerCase();
     return text.includes(search.toLowerCase());
   });
-  const toggleStudent = id => set('studentIds', data.studentIds.includes(id)
-    ? data.studentIds.filter(studentId => studentId !== id)
-    : [...data.studentIds, id]);
+  const toggleStudent = id => setData(current => ({
+    ...current,
+    studentIds: current.studentIds.includes(id)
+      ? current.studentIds.filter(studentId => studentId !== id)
+      : [...current.studentIds, id],
+    studentResults: current.studentIds.includes(id)
+      ? Object.fromEntries(Object.entries(current.studentResults).filter(([studentId]) => studentId !== id))
+      : { ...current.studentResults, [id]: 'PENDING' }
+  }));
 
   return (
     <form className="form" onSubmit={event => { event.preventDefault(); onSave(data); }}>
@@ -64,13 +78,16 @@ function InterviewRoundForm({ value = {}, companies, drives, onClose, onSave }) 
       <label>Result / Notes<input value={data.result || ''} onChange={event => set('result', event.target.value)} /></label>
       <div className="candidate-select">
         <b>Students / Candidates</b>
-        <small>Only shortlisted candidates for this placement drive can be assigned.</small>
+        <small>Only shortlisted candidates who passed the previous completed round can be assigned.</small>
         <input aria-label="Search candidates" placeholder="Search by name, email, ID, or branch" value={search} onChange={event => setSearch(event.target.value)} disabled={!data.placementDrive} />
         {!data.placementDrive ? <p className="muted">Select a placement drive to choose candidates.</p>
           : <div className="candidate-list">
-            {filteredCandidates.length ? filteredCandidates.map(({ student }) => <label className="candidate" key={student._id}>
+            {filteredCandidates.length ? filteredCandidates.map(({ student, applicationStatus, eligibleForRound }) => <label className="candidate" key={student._id}>
               <input type="checkbox" checked={data.studentIds.includes(String(student._id))} onChange={() => toggleStudent(String(student._id))} />
-              <span><b>{student.name}</b><small>{student.registrationNumber || student.email}{student.branch ? ` · ${student.branch}` : ''}</small></span>
+              <span><b>{student.name}</b><small>{student.registrationNumber || student.email}{student.branch ? ` · ${student.branch}` : ''} · {applicationStatus} · {eligibleForRound ? 'Eligible' : 'Previously assigned'}</small></span>
+              {data.studentIds.includes(String(student._id)) && <select aria-label={`Result for ${student.name}`} value={data.studentResults[String(student._id)] || 'PENDING'} onChange={event => set('studentResults', { ...data.studentResults, [String(student._id)]: event.target.value })}>
+                <option>PENDING</option><option>PASSED</option><option>FAILED</option>
+              </select>}
             </label>) : <p className="muted">No shortlisted candidates found for this drive.</p>}
           </div>}
         <small>{data.studentIds.length} student{data.studentIds.length === 1 ? '' : 's'} assigned</small>
@@ -104,8 +121,8 @@ export default function Interviews() {
     }
   };
   return <>
-    <PageHeader eyebrow="INTERVIEW MANAGEMENT" title="Interview Rounds" copy="Schedule and manage placement interview rounds."
-      action={<button id="create-interview-btn" onClick={() => setModal({})}>+ Create Interview Round</button>} />
+    <PageHeader eyebrow="ROUND MANAGEMENT" title="Rounds" copy="Schedule aptitude, coding, technical, and HR rounds. Select candidates one by one; students who pass a completed round become eligible for the next round."
+      action={<button id="create-interview-btn" onClick={() => setModal({})}>+ Schedule Round</button>} />
     {!items ? <Loading /> : <Table heads={['Company', 'Drive', 'Round', 'Date', 'Time', 'Location', 'Students', 'Status', 'Actions']}>
       {items.map(item => <tr key={item._id}>
         <td>{item.company?.name}</td><td>{item.placementDrive?.jobTitle}</td>
@@ -115,7 +132,7 @@ export default function Interviews() {
         <td><Badge text={item.status} /></td><td><Actions edit={() => edit(item)} del={() => del(item)} /></td>
       </tr>)}
     </Table>}
-    {modal && <Modal title={modal.x ? 'Edit interview round' : 'Create interview round'} onClose={() => setModal(null)}>
+    {modal && <Modal title={modal.x ? 'Edit round and candidates' : 'Schedule round'} onClose={() => setModal(null)}>
       <InterviewRoundForm key={modal.x?._id || 'new'} value={modal.x} companies={companies} drives={drives} onClose={() => setModal(null)} onSave={save} />
     </Modal>}
   </>;

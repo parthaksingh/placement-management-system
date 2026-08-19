@@ -2,7 +2,7 @@ import React, { useEffect, useState } from 'react';
 import { api } from '../../api.js';
 import { Loading, PageHeader, Table, Badge, fmtDate } from './shared.jsx';
 
-const STATUSES = ['PENDING', 'UNDER REVIEW', 'SHORTLISTED', 'REJECTED', 'SELECTED'];
+const STATUSES = ['APPLIED', 'PENDING', 'UNDER REVIEW', 'SHORTLISTED', 'NOT SHORTLISTED', 'REJECTED', 'SELECTED'];
 
 export default function Applications() {
   const [items, setItems] = useState();
@@ -24,7 +24,7 @@ export default function Applications() {
         <span>Filter by student name. Status changes auto-notify the student.</span>
       </div>
       {!items ? <Loading /> : (
-        <Table heads={['Student','Company','Job Title','Applied','Current Stage','Status','Update Status']}>
+        <Table heads={['Student','Company','Job Title','Applied','Current Stage','Status','Actions']}>
           {items.map(x => (
             <tr key={x._id}>
               <td><b>{x.student?.name}</b></td>
@@ -34,13 +34,13 @@ export default function Applications() {
               <td>{x.currentStage}</td>
               <td><Badge text={x.status} /></td>
               <td>
-                <select
-                  className="status-select"
-                  value={x.status}
-                  onChange={e => change(x, e.target.value)}
-                >
-                  {STATUSES.map(s => <option key={s}>{s}</option>)}
-                </select>
+                <span className="actions">
+                  {x.status !== 'SHORTLISTED' && <button onClick={() => change(x, 'SHORTLISTED')}>Shortlist</button>}
+                  {x.status !== 'REJECTED' && <button className="danger" onClick={() => change(x, 'REJECTED')}>Reject</button>}
+                  <select className="status-select" value={x.status} onChange={e => change(x, e.target.value)} aria-label={`Update ${x.student?.name}'s status`}>
+                    {STATUSES.map(s => <option key={s}>{s}</option>)}
+                  </select>
+                </span>
               </td>
             </tr>
           ))}

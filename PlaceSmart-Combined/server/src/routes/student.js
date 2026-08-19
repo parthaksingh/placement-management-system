@@ -73,7 +73,9 @@ router.get('/interview-rounds', async (req, res, next) => {
       .select('placementDrive status')
       .lean();
     const applicationStatus = new Map(applications.map(application => [String(application.placementDrive), application.status]));
-    const rounds = assignments.map(assignment => assignment.interviewRound).filter(Boolean);
+    const rounds = assignments
+      .filter(assignment => assignment.interviewRound)
+      .map(assignment => ({ ...assignment.interviewRound, assignmentResult: assignment.result }));
     res.json(sortInterviewRounds(rounds).map(round => ({
       ...round,
       applicationStatus: applicationStatus.get(String(round.placementDrive?._id)) || 'ASSIGNED'
@@ -100,8 +102,8 @@ router.post('/applications', async (req, res, next) => {
         student: student._id,
         company: drive.company._id,
         placementDrive: drive._id,
-        status: 'PENDING',
-        currentStage: 'Application'
+        status: 'APPLIED',
+        currentStage: 'APPLIED'
       });
       await Notification.create({
         title: 'Application submitted',

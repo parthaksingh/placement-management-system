@@ -27,7 +27,8 @@ function AdminApp({ user, onSignOut }) {
           <Route path="/companies" element={<Companies />} />
           <Route path="/placement-drives" element={<Drives />} />
           <Route path="/applications" element={<Applications />} />
-          <Route path="/interview-rounds" element={<Interviews />} />
+          <Route path="/rounds" element={<Interviews />} />
+          <Route path="/interview-rounds" element={<Navigate to="/rounds" replace />} />
           <Route path="/reports" element={<Reports />} />
           <Route path="/notifications" element={<Notifications />} />
           <Route path="*" element={<Navigate to="/" replace />} />

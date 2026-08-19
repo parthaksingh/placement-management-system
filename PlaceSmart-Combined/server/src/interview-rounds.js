@@ -43,6 +43,13 @@ export function assignmentStudentIds(studentIds) {
   return [...new Set((studentIds ?? []).map(String).filter(Boolean))];
 }
 
+export function assignmentResults(studentIds, results = {}) {
+  return Object.fromEntries(assignmentStudentIds(studentIds).map(studentId => [
+    studentId,
+    ['PENDING', 'PASSED', 'FAILED'].includes(results[studentId]) ? results[studentId] : 'PENDING'
+  ]));
+}
+
 export function interviewNotification(round, drive, company, updated = false) {
   const date = round.date ? new Date(round.date).toLocaleDateString('en-IN', {
     day: '2-digit', month: 'short', year: 'numeric'

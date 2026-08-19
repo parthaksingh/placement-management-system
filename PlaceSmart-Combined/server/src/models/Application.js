@@ -6,8 +6,8 @@ const schema = new mongoose.Schema({
   currentStage: { type: String, default: 'Application' },
   status: {
     type: String,
-    enum: ['PENDING', 'UNDER REVIEW', 'SHORTLISTED', 'REJECTED', 'SELECTED'],
-    default: 'PENDING'
+    enum: ['APPLIED', 'PENDING', 'UNDER REVIEW', 'SHORTLISTED', 'NOT SHORTLISTED', 'REJECTED', 'SELECTED'],
+    default: 'APPLIED'
   }
 }, { timestamps: true });
 schema.index({ student: 1, placementDrive: 1 }, { unique: true });

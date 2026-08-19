@@ -2,7 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { normalizeBranch, normalizeSkill } from '../../../shared/eligibility-normalization.mjs';
 import { eligibility } from '../src/eligibility.js';
-import { assignmentStudentIds, interviewNotification, roundPayload, roundsForShortlistedApplications, sortInterviewRounds } from '../src/interview-rounds.js';
+import { assignmentResults, assignmentStudentIds, interviewNotification, roundPayload, roundsForShortlistedApplications, sortInterviewRounds } from '../src/interview-rounds.js';
 
 const equivalent = (normalizer, left, right) =>
   assert.equal(normalizer(left), normalizer(right), `${left} should equal ${right}`);
@@ -81,6 +81,9 @@ test('student interview flow only returns rounds for shortlisted application dri
 
 test('interview assignments deduplicate students and notify with stored schedule data', () => {
   assert.deepEqual(assignmentStudentIds(['student-1', 'student-1', '', 'student-2']), ['student-1', 'student-2']);
+  assert.deepEqual(assignmentResults(['student-1', 'student-2'], { 'student-1': 'PASSED', 'student-2': 'invalid' }), {
+    'student-1': 'PASSED', 'student-2': 'PENDING'
+  });
   const notification = interviewNotification(
     { roundName: 'Coding', date: '2027-10-12', time: '12:20', location: 'Seminar Hall A' },
     { jobTitle: 'Software Engineer' }, { name: 'Microsoft' }

@@ -7,7 +7,7 @@ const adminRoutes = [
   { path: '/companies', label: 'Companies' },
   { path: '/placement-drives', label: 'Placement Drives' },
   { path: '/applications', label: 'Applications' },
-  { path: '/interview-rounds', label: 'Interview Rounds' },
+  { path: '/rounds', label: 'Rounds' },
   { path: '/reports', label: 'Reports' },
   { path: '/notifications', label: 'Notifications' }
 ];

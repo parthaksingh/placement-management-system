@@ -13,7 +13,7 @@ function Stat({ label, value, sub, tone }) {
   );
 }
 
-const navItems = ['Overview', 'Placement drives', 'My applications', 'Interviews', 'Notifications', 'My profile'];
+const navItems = ['Overview', 'Placement drives', 'My applications', 'Rounds', 'Notifications', 'My profile'];
 const navIcons = ['⌂', '▦', '◫', '◷', '♧', '◎'];
 
 function Sidebar({ tab, setTab, logout }) {
@@ -93,7 +93,7 @@ export default function StudentDashboard({ user, tab, setTab, logout }) {
   }, []);
 
   useEffect(() => {
-    if (tab === 'Interviews') {
+    if (tab === 'Rounds') {
       api('/student/interview-rounds').then(rounds => setInterviewRounds(rounds || [])).catch(() => {});
     }
   }, [tab]);
@@ -214,11 +214,35 @@ export default function StudentDashboard({ user, tab, setTab, logout }) {
   );
 
   const interviewApps = apps.filter(a => a.status === 'SHORTLISTED');
+  const placementProgress = apps.filter(application =>
+    application.status === 'SHORTLISTED' || interviewRounds.some(round => String(round.placementDrive?._id) === String(application.placementDrive?._id))
+  ).map(application => {
+    const rounds = interviewRounds.filter(round => String(round.placementDrive?._id) === String(application.placementDrive?._id));
+    const nextRound = rounds.find(round => round.assignmentResult === 'PENDING' && round.status === 'SCHEDULED');
+    return <article className="progress-card" key={application._id}>
+      <h3>{application.company?.name || 'Company'} <span>·</span> {application.placementDrive?.jobTitle || 'Placement drive'}</h3>
+      <div className="progress-steps">
+        <span className="done">✓ Applied</span>
+        <span className={application.status === 'SHORTLISTED' || rounds.length ? 'done' : ''}>{application.status === 'SHORTLISTED' || rounds.length ? '✓' : '○'} Shortlisted</span>
+        {rounds.map(round => <span key={round._id} className={round.assignmentResult === 'PASSED' ? 'done' : round.assignmentResult === 'FAILED' ? 'failed' : 'current'}>
+          {round.assignmentResult === 'PASSED' ? '✓' : round.assignmentResult === 'FAILED' ? '×' : '●'} {round.roundName}
+        </span>)}
+        <span className={application.status === 'SELECTED' ? 'done' : ''}>{application.status === 'SELECTED' ? '✓' : '○'} Final Result</span>
+      </div>
+      {nextRound && <div className="next-round">
+        <b>NEXT ROUND</b><strong>{nextRound.roundName}</strong>
+        <span>📅 {nextRound.date ? new Date(nextRound.date).toLocaleDateString('en-IN') : 'Date to be announced'} · 🕐 {nextRound.time || 'Time to be announced'}</span>
+        {nextRound.location && <span>📍 {nextRound.location}</span>}
+        <span className="chip blue">{nextRound.status}</span>
+      </div>}
+    </article>;
+  });
   const interviews = (
     <section className="panel drives">
       <div className="panel-title">
         <div><h2>Upcoming interviews</h2><p>Your scheduled technical rounds and interviews.</p></div>
       </div>
+      {placementProgress.length > 0 && <section className="placement-progress"><h3>Placement progress</h3>{placementProgress}</section>}
       {interviewRounds.length ? interviewRounds.map(round => (
         <article className="drive" key={round._id}>
           <div className="logo">{round.company?.name?.slice(0, 1) || 'I'}</div>
@@ -230,6 +254,7 @@ export default function StudentDashboard({ user, tab, setTab, logout }) {
             <div style={{ display: 'flex', flexWrap: 'wrap', gap: '6px', alignItems: 'center' }}>
               {round.location && <span className="chip">Location: {round.location}</span>}
               <span className="chip blue">{round.status}</span>
+              {round.assignmentResult && <span className="chip">Result: {round.assignmentResult}</span>}
               {round.meetingLink && <a className="link" href={round.meetingLink} target="_blank" rel="noopener noreferrer">Join Interview</a>}
             </div>
             {round.description && <p style={{ marginTop: '10px' }}>{round.description}</p>}
@@ -453,7 +478,7 @@ export default function StudentDashboard({ user, tab, setTab, logout }) {
       <main className="workspace">
         {tab === 'Placement drives' && <>{pageHeader('PLACEMENT DRIVES', 'Find your next opportunity', 'Browse current companies and apply to roles that match your profile.')}{toastEl}{driveList}</>}
         {tab === 'My applications' && <>{pageHeader('MY APPLICATIONS', 'Your applications', 'Follow each application from submission through the final result.')}{toastEl}{applicationsList}</>}
-        {tab === 'Interviews' && <>{pageHeader('INTERVIEWS', 'Interview schedule', 'Stay prepared for your upcoming placement rounds.')}{toastEl}{interviews}</>}
+        {tab === 'Rounds' && <>{pageHeader('ROUNDS', 'Round schedule', 'See only the aptitude, coding, technical, and HR rounds assigned to you.')}{toastEl}{interviews}</>}
         {tab === 'Notifications' && <>{pageHeader('NOTIFICATIONS', 'Your updates', 'The latest activity from the placement cell and companies.')}{toastEl}{notificationList}</>}
         {tab === 'My profile' && <>{pageHeader('MY PROFILE', 'Profile details', 'Manage your technologies, technical skills, contact info, and view verified academic records.')}{toastEl}{profileSection}</>}
         {tab === 'Overview' && (

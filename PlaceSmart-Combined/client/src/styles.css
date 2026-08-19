@@ -144,7 +144,7 @@ td small.sub { display: block; font-size: 11px; color: var(--muted); margin-top:
 .badge.SELECTED, .badge.ACTIVE, .badge.PLACED, .badge.COMPLETED { background: #d8f5eb; color: #147a53; }
 .badge.SHORTLISTED, .badge.SCHEDULED { background: #e8edff; color: #3d5ab5; }
 .badge.REJECTED, .badge.INACTIVE, .badge.CANCELLED { background: #fce8ea; color: #b72533; }
-.badge.PENDING, .badge.DRAFT { background: #fff4df; color: #a06b00; }
+.badge.APPLIED, .badge.PENDING, .badge.DRAFT { background: #fff4df; color: #a06b00; }
 .badge.UNDER-REVIEW { background: #ede8ff; color: #5b3ea6; }
 
 /* Actions */
@@ -186,8 +186,22 @@ td small.sub { display: block; font-size: 11px; color: var(--muted); margin-top:
 .candidate { display: flex !important; flex-direction: row !important; align-items: center; gap: 10px; padding: 10px 12px; border-bottom: 1px solid var(--line); cursor: pointer; }
 .candidate:last-child { border-bottom: 0; }
 .candidate input { width: auto; }
+.candidate select { width: auto; margin-left: auto; padding: 5px; }
 .candidate span { display: grid; gap: 2px; }
 .candidate small { color: var(--muted); }
+.placement-progress { display: grid; gap: 10px; margin: 4px 0 20px; }
+.placement-progress > h3 { margin: 0; font-size: 15px; }
+.progress-card { border: 1px solid var(--line); border-radius: 8px; padding: 14px; background: #fafbff; }
+.progress-card h3 { margin: 0 0 10px; font-size: 14px; }
+.progress-card h3 span { color: var(--muted); }
+.progress-steps { display: flex; flex-wrap: wrap; gap: 6px; font-size: 12px; }
+.progress-steps span { padding: 4px 7px; border-radius: 12px; background: #f0f2f7; color: var(--muted); }
+.progress-steps .done { background: #d8f5eb; color: #147a53; }
+.progress-steps .current { background: #e8edff; color: #3d5ab5; }
+.progress-steps .failed { background: #fce8ea; color: #b72533; }
+.next-round { display: grid; gap: 4px; margin-top: 12px; padding: 10px; border-left: 3px solid var(--blue); background: #fff; font-size: 12px; }
+.next-round b { color: var(--blue); font-size: 10px; }
+.next-round strong { font-size: 13px; }
 
 /* Detail view in modal */
 .detail p { font-size: 13px; margin: 0 0 8px; }
